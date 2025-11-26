@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Roblox Live Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <style>html,body,#map{height:100%;margin:0;padding:0}</style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script>
+    // VERVANG DIT MET JE NODE-SERVER URL, bv 'https://mijnserver.example.com'
+    const NODE_SERVER = 'https://JOUW_NODE_SERVER_URL';
+
+    const socket = io(NODE_SERVER, { transports: ['websocket'] });
+
+    const map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const markers = {};
+
+    function toLatLng(pos) {
+      return [pos.z || 0, pos.x || 0];
+    }
+
+    socket.on('connect', () => console.log('connected to server'));
+
+    socket.on('update', (data) => {
+      const id = data.userId;
+      const latlng = toLatLng(data.position);
+      const popup = `${data.name} — ${data.vehicle || 'on foot'}`;
+
+      if (!markers[id]) {
+        markers[id] = L.marker(latlng).addTo(map).bindPopup(popup);
+      } else {
+        markers[id].setLatLng(latlng).setPopupContent(popup);
+      }
+    });
+
+    // Als jouw Node server ook een REST endpoint heeft om huidige posities te halen:
+    fetch(NODE_SERVER + '/api/positions').then(r=>r.json()).then(list=>{
+      list.forEach(data=>{
+        const id = data.userId;
+        const latlng = toLatLng(data.position);
+        const popup = `${data.name} — ${data.vehicle || 'on foot'}`;
+        markers[id] = L.marker(latlng).addTo(map).bindPopup(popup);
+      });
+    }).catch(e => console.log('Kan positions niet laden:', e));
+  </script>
+</body>
+</html>
